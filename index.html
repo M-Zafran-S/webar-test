@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Horizontal Rotation WebAR Test</title>
+    <title>Advanced Interactive WebAR Test</title>
     
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -31,33 +31,15 @@
       <a-camera position="0 0 0" look-controls="enabled: false" camera="near: 0.01; far: 10000;"></a-camera>
       
       <a-entity mindar-image-target="targetIndex: 0">
-        <a-gltf-model 
-          id="model-0"
-          src="#cone"
-          rotation="0 0 0" 
-          position="0 0 0.1" 
-          scale="1 1 1">
-        </a-gltf-model>
+        <a-gltf-model id="model-0" src="#cone" rotation="0 0 0" position="0 0 0.1" scale="1 1 1"></a-gltf-model>
       </a-entity>
 
       <a-entity mindar-image-target="targetIndex: 1">
-        <a-gltf-model 
-          id="model-1"
-          src="#cube"
-          rotation="0 0 0" 
-          position="0 0 0.1" 
-          scale="1 1 1">
-        </a-gltf-model>
+        <a-gltf-model id="model-1" src="#cube" rotation="0 0 0" position="0 0 0.1" scale="1 1 1"></a-gltf-model>
       </a-entity>
 
       <a-entity mindar-image-target="targetIndex: 2">
-        <a-gltf-model 
-          id="model-2"
-          src="#sphere"
-          rotation="0 0 0" 
-          position="0 0 0.1" 
-          scale="1 1 1">
-        </a-gltf-model>
+        <a-gltf-model id="model-2" src="#sphere" rotation="0 0 0" position="0 0 0.1" scale="1 1 1"></a-gltf-model>
       </a-entity>
 
     </a-scene>
@@ -65,42 +47,82 @@
     <script>
       let isDragging = false;
       let previousTouchX = 0;
-      const rotationSpeed = 0.5; // Adjust this number to make it spin faster or slower
+      let initialPinchDistance = 0;
+      let initialModelScales = [1, 1, 1]; // Fallback baseline scale tracking arrays
 
-      // Listen for screen touch initiation
+      const rotationSpeed = 0.5;
+      const scaleSpeed = 0.005; // Tweak this value to make pinching zoom faster/slower
+
+      // Helper helper function to calculate pixel distance between two fingers
+      function getPinchDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
       window.addEventListener('touchstart', (e) => {
-        isDragging = true;
-        previousTouchX = e.touches[0].clientX;
-      });
-
-      // Listen for finger dragging across the glass screen
-      window.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-
-        // Calculate horizontal distance covered by finger swipe
-        const currentTouchX = e.touches[0].clientX;
-        const deltaX = currentTouchX - previousTouchX;
-        previousTouchX = currentTouchX;
-
-        // Apply horizontal rotation change to all 3 models seamlessly
-        for (let i = 0; i <= 2; i++) {
-          const model = document.getElementById(`model-${i}`);
+        if (e.touches.length === 1) {
+          // Setup for Single Finger Horizontal Rotation
+          isDragging = true;
+          previousTouchX = e.touches[0].clientX;
+        } else if (e.touches.length === 2) {
+          // Setup for Two Finger Scale — Instantly kills rotation drag states
+          isDragging = false; 
+          initialPinchDistance = getPinchDistance(e.touches[0], e.touches[1]);
+          
+          // Grab current scale of the first active model instance to use as base reference
+          const model = document.getElementById('model-0');
           if (model) {
-            // Fetch current rotation object states
-            let currentRotation = model.getAttribute('rotation');
-            
-            // Modify ONLY the Y axis (Horizontal panning plane rotation)
-            currentRotation.y += deltaX * rotationSpeed;
-            
-            // Push updated spatial attributes back to the DOM element
-            model.setAttribute('rotation', currentRotation);
+            const currentScale = model.getAttribute('scale');
+            initialModelScales = [currentScale.x, currentScale.y, currentScale.z];
           }
         }
       });
 
-      // Reset state tracking when finger leaves the glass display interface
-      window.addEventListener('touchend', () => {
-        isDragging = false;
+      window.addEventListener('touchmove', (e) => {
+        // CASE 1: Single-finger swipe (Rotate exclusively on Y-axis)
+        if (e.touches.length === 1 && isDragging) {
+          const currentTouchX = e.touches[0].clientX;
+          const deltaX = currentTouchX - previousTouchX;
+          previousTouchX = currentTouchX;
+
+          for (let i = 0; i <= 2; i++) {
+            const model = document.getElementById(`model-${i}`);
+            if (model) {
+              let rotation = model.getAttribute('rotation');
+              rotation.y += deltaX * rotationSpeed;
+              model.setAttribute('rotation', rotation);
+            }
+          }
+        } 
+        // CASE 2: Two-finger pinch (Scale up/down, rotation code is skipped entirely)
+        else if (e.touches.length === 2) {
+          const currentPinchDistance = getPinchDistance(e.touches[0], e.touches[1]);
+          const deltaDistance = currentPinchDistance - initialPinchDistance;
+
+          // Calculate new target scale factor based on movement delta
+          let newScaleFactor = initialModelScales[0] + (deltaDistance * scaleSpeed);
+          
+          // Restrict bounds so users can't scale models infinitely large or invert them negative
+          newScaleFactor = Math.max(0.1, Math.min(newScaleFactor, 5.0));
+
+          for (let i = 0; i <= 2; i++) {
+            const model = document.getElementById(`model-${i}`);
+            if (model) {
+              model.setAttribute('scale', `${newScaleFactor} ${newScaleFactor} ${newScaleFactor}`);
+            }
+          }
+        }
+      });
+
+      window.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+          isDragging = false;
+        } else if (e.touches.length === 1) {
+          // If they lift 1 finger but leave 1 down, reset the rotation drag reference point safely
+          isDragging = true;
+          previousTouchX = e.touches[0].clientX;
+        }
       });
     </script>
   </body>
