@@ -29,7 +29,7 @@ To ensure the application runs smoothly, always maintain the file structure exac
 The client or any administrator can expand this app to support infinite pictures by following these steps:
 
 Step 1: Compile the New Target Image
-Edit your QR code at https://generatorqr.com/.
+Edit your QR code at https://www.qrcode-monkey.com.
 
 Edit the frame background color or leave it as white (#FFFFFF) and the change text to the name of target object. You can also use abbreviation if the name is too long.
 
